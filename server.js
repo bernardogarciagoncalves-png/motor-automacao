@@ -16,33 +16,43 @@ const openai = new OpenAI({
 app.post('/api/executar-tarefa', async (req, res) => {
   try {
     const promptDoUsuario = req.body.mensagem || req.body.prompt || req.body.texto || "Olá";
-    const contextoImoveis = req.body.contexto || req.body.imoveis || req.body.dados || [];
+    let contextoImoveis = req.body.contexto || req.body.imoveis || req.body.dados || [];
     const historicoConversa = req.body.historico || [];
 
+    // 1. TRATAMENTO E FILTRAGEM DURA VIA CÓDIGO (PREVINE FALHAS DA IA)
+    const textoMsg = String(promptDoUsuario).toLowerCase();
+    
+    if (Array.isArray(contextoImoveis) && contextoImoveis.length > 0) {
+      // Se o usuário citou Arcos, removemos QUALQUER imóvel de outra cidade via código
+      if (textoMsg.includes('arcos')) {
+        contextoImoveis = contextoImoveis.filter(imovel => {
+          const dadosStr = JSON.stringify(imovel).toLowerCase();
+          return dadosStr.includes('arcos') && !dadosStr.includes('bom despacho');
+        });
+      }
+      
+      // Se pediu casa/moradia, removemos salas comerciais/lojas via código
+      if (textoMsg.includes('casa') || textoMsg.includes('alugar') || textoMsg.includes('morar')) {
+        contextoImoveis = contextoImoveis.filter(imovel => {
+          const dadosStr = JSON.stringify(imovel).toLowerCase();
+          return !dadosStr.includes('sala') && !dadosStr.includes('comercial') && !dadosStr.includes('galpão');
+        });
+      }
+    }
+
+    // 2. PROMPT ENXUTO E DIRETO (SEM POLUIÇÃO DE CÓDIGO)
     const promptSistema = `Você é a Garcia IA, assistente e consultora de vendas da Garcia Imóveis. 
-Sua conversa deve ser como a de um corretor humano experiente no WhatsApp: amigável, acolhedora, curta, com emojis e objetiva.
+Sua conversa deve ser como a de um corretor humano no WhatsApp: amigável, objetiva, curta e usando emojis.
 
-INFORMAÇÕES DA EMPRESA:
-1. Atuamos em Arcos, Bom Despacho, Lagoa da Prata e região.
-2. Correspondente Bancário do Banco do Brasil: financiamentos imobiliários, crédito consignado, empréstimos com garantia de imóvel.
-3. Venda e aluguel de imóveis e loteamentos.
+REGRAS DE CONVERSA:
+1. Os imóveis fornecidos no contexto JÁ FORAM FILTRADOS para a cidade e categoria exatas solicitadas.
+2. Se houver imóveis disponíveis no contexto, cite brevemente a opção e envie OBRIGATORIAMENTE o card no formato:
+   ||| [VER_IMOVEL:{"titulo":"Nome do Imovel","imagem":"URL_DA_IMAGEM","link":"URL_DO_IMOVEL","preco":"R$ XX"}] |||
+3. Se o contexto estiver VAZIO [], diga que no momento não temos essa opção disponível na cidade/bairro solicitada e pergunte se o cliente gostaria de deixar o WhatsApp para ser avisado ou se deseja simular uma compra/financiamento.
+4. JAMAIS crie links no formato markdown tradicional [Texto](url) nem texto como !Imagem. Use APENAS a tag [VER_IMOVEL:{...}] isolada.
+5. Separe os balões de conversa pelo delimitador "|||".
 
-TRAVA RIGOROSA: RESIDENCIAL vs. COMERCIAL (EXTREMAMENTE IMPORTANTE):
-1. SEPARAÇÃO DE CATEGORIA:
-   - "Casa", "Sobrado", "Apartamento", "Cobertura residencial" são imóveis RESIDENCIAIS (para morar).
-   - "Sala Comercial", "Loja", "Galpão", "Prédio Comercial" são imóveis COMERCIAIS (para empresas/negócios).
-2. SE O CLIENTE PEDIR CASA OU MORADIA:
-   - É PROIBIDO exibir ou sugerir Salas Comerciais ou Lojas!
-   - Se o cliente pediu casa para alugar em Arcos, você DEVE filtrar o banco de dados e mostrar APENAS CASAS (ou apartamentos/coberturas se o cliente aceitar moradia).
-   - Se só houver salas comerciais no Centro, diga: "Para moradia (casa) não temos opção no Centro no momento, mas temos esta casa residencial para alugar em outro bairro de Arcos:" (e mostre apenas a casa residencial).
-
-REGRAS DE CARDS E MENSAGENS:
-- Separe os balões de conversa pelo delimitador "|||".
-- Para indicar imóveis do banco de dados, use APENAS este formato isolado por |||:
-  ||| [VER_IMOVEL:{"titulo":"Nome do Imovel","imagem":"URL_DA_IMAGEM","link":"URL_DO_IMOVEL","preco":"R$ XX"}] |||
-- NUNCA solicite CPF/RG ou documentos pelo chat, e NUNCA agende horários fixos sem confirmação.
-
-BANCO DE DADOS DE IMÓVEIS DISPONÍVEIS:
+IMÓVEIS DISPONÍVEIS E FILTRADOS:
 ${JSON.stringify(contextoImoveis, null, 2)}`;
 
     const mensagensParaOpenAI = [
