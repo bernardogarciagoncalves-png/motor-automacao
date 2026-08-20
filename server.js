@@ -17,30 +17,39 @@ app.post('/api/executar-tarefa', async (req, res) => {
   try {
     const promptDoUsuario = req.body.mensagem || req.body.prompt || req.body.texto || "Olá";
     const contextoImoveis = req.body.contexto || req.body.imoveis || req.body.dados || [];
+    const historicoConversa = req.body.historico || [];
 
     const promptSistema = `Você é a Garcia IA, assistente da Garcia Imóveis. 
 Sua conversa deve parecer a de um corretor humano no WhatsApp: amigável, direta, curta e objetiva.
 
-INFORMAÇÕES CHAVE DA IMPRESA:
+INFORMAÇÕES CHAVE DA EMPRESA:
 1. Atuamos como CORRESPONDENTE BANCÁRIO DO BANCO DO BRASIL. Oferecemos financiamentos imobiliários, crédito consignado, empréstimos com garantia e opções facilitadas.
-2. Também oferecemos opções de loteamentos com financiamento próprio e sem entrada.
+2. Oferecemos aluguel e vendas de imóveis e loteamentos.
 
-REGRAS DE FORMATAÇÃO E TOM (OBRIGATÓRIO):
+REGRAS DE MEMÓRIA E CONTEXTO (EXTREMAMENTE IMPORTANTE):
+- MANTENHA O FOCO DO ASSUNTO ANTERIOR. Se o cliente pediu "aluguel" ou "venda", continue sugerindo APENAS a mesma categoria a menos que ele explicitamente mude de ideia.
+- NÃO misture opções de venda de lotes quando o cliente estiver procurando casas para alugar.
+
+REGRAS DE FORMATAÇÃO E TOM:
 - NÃO use asteriscos (**) nem símbolos excessivos de formatação.
-- Faça frases curtas e pule linhas entre os pensamentos para facilitar a leitura.
-- Responda em no máximo 2 a 3 parágrafos curtos. Termine sempre fazendo uma pergunta amigável para continuar o diálogo.
+- Faça frases curtas e pule linhas entre os pensamentos.
+- Responda em no máximo 2 a 3 parágrafos curtos.
 - Quando recomendar um imóvel do banco de dados, envie no seguinte formato Markdown exato:
   [IMOV:{"titulo":"Nome do Imovel","imagem":"URL_DA_IMAGEM","link":"URL_DO_IMOVEL","preco":"R$ XX"}]
 
 BANCO DE DADOS DE IMÓVEIS DISPONÍVEIS:
 ${JSON.stringify(contextoImoveis, null, 2)}`;
 
+    // Monta o array de mensagens incluindo o histórico para acabar com a amnésia
+    const mensagensParaOpenAI = [
+      { role: "system", content: promptSistema },
+      ...historicoConversa,
+      { role: "user", content: String(promptDoUsuario) }
+    ];
+
     const resposta = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: promptSistema },
-        { role: "user", content: String(promptDoUsuario) }
-      ],
+      messages: mensagensParaOpenAI,
     });
 
     const resultado = resposta.choices[0].message.content;
