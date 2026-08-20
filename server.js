@@ -13,26 +13,21 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Rota de teste
-app.get('/', (req, res) => {
-  res.send('Motor de automação está online e pronto! 🚀');
-});
-
-// Rota para a IA processar tarefas
 app.post('/api/executar-tarefa', async (req, res) => {
   try {
-    const { instrucao, dadosEntrada } = req.body;
+    // Aceita tanto req.body.mensagem quanto req.body.prompt ou texto direto
+    const promptDoUsuario = req.body.mensagem || req.body.prompt || req.body.texto || "Olá";
 
     const resposta = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
-        { role: 'system', content: instrucao },
-        { role: 'user', content: dadosEntrada },
+        { role: "system", content: "Você é a Garcia IA, assistente virtual da imobiliária Garcia Imóveis. Seja cortês, objetiva e ajude clientes com dúvidas sobre imóveis, crédito consignado e financiamentos." },
+        { role: "user", content: String(promptDoUsuario) }
       ],
     });
 
     const resultado = resposta.choices[0].message.content;
-    res.status(200).json({ sucesso: true, resultado });
+    res.status(200).json({ sucesso: true, resultado: resultado });
   } catch (erro) {
     console.error('Erro na automação:', erro);
     res.status(500).json({ sucesso: false, erro: erro.message });
@@ -41,5 +36,5 @@ app.post('/api/executar-tarefa', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
