@@ -30,13 +30,43 @@ if (supabaseUrl && supabaseKey) {
 app.post('/api/executar-tarefa', async (req, res) => {
   try {
     const promptDoUsuario = req.body.mensagem || req.body.prompt || req.body.texto || "Olá";
-    const contextoImoveis = req.body.contexto || req.body.imoveis || req.body.dados || [];
+    let contextoImoveis = req.body.contexto || req.body.imoveis || req.body.dados || [];
     const historicoConversa = req.body.historico || [];
     const imovelAtual = req.body.imovelAtual || null;
 
+    // =========================================================================
+    // FILTRAGEM INTELIGENTE DE CATEGORIAS EM CÓDIGO (RESIDENCIAL VS COMERCIAL)
+    // =========================================================================
+    const textoMsg = String(promptDoUsuario).toLowerCase();
+
+    if (Array.isArray(contextoImoveis) && contextoImoveis.length > 0) {
+      const palResidenciais = ['casa', 'apartamento', 'sobrado', 'kitnet', 'morar', 'residencial'];
+      const palComerciais = ['sala', 'comodo', 'cômodo', 'galpao', 'galpão', 'loja', 'comercial', 'predio comercial', 'prédio comercial'];
+
+      const pedeResidencial = palResidenciais.some(p => textoMsg.includes(p));
+      const pedeComercial = palComerciais.some(p => textoMsg.includes(p));
+
+      // Se o cliente pediu moradia (casa, apto, sobrado, kitnet), REMOVE comerciais
+      if (pedeResidencial && !pedeComercial) {
+        contextoImoveis = contextoImoveis.filter(imovel => {
+          const dadosStr = JSON.stringify(imovel).toLowerCase();
+          const eComercial = palComerciais.some(c => dadosStr.includes(c));
+          return !eComercial;
+        });
+      }
+
+      // Se o cliente pediu comercial (sala, cômodo, galpão, loja), REMOVE residenciais
+      if (pedeComercial && !pedeResidencial) {
+        contextoImoveis = contextoImoveis.filter(imovel => {
+          const dadosStr = JSON.stringify(imovel).toLowerCase();
+          const eComercial = palComerciais.some(c => dadosStr.includes(c));
+          return eComercial;
+        });
+      }
+    }
+
+    // 1. Consulta aprendizados de forma segura no Supabase
     let exemplosAprendizado = "";
-    
-    // Consulta aprendizados de forma segura
     if (supabase) {
       try {
         const { data: feedbacks } = await supabase
@@ -67,11 +97,19 @@ INFORMAÇÕES DA EMPRESA:
 1. Correspondente Bancário do Banco do Brasil (financiamentos imobiliários, crédito consignado, empréstimos com garantia de imóvel).
 2. Venda e aluguel de imóveis e loteamentos em Arcos, Bom Despacho, Lagoa da Prata e região.
 
-ESTRATÉGIA COMERCIAL DE VENDAS E PRIORIDADES (MUITO IMPORTANTE):
+CLASSIFICAÇÃO RÍGIDA DE IMÓVEIS (EXTREMAMENTE IMPORTANTE):
+1. ALUGUEL RESIDENCIAL (para morar):
+   - Termos: "casa", "apartamento", "sobrado", "kitnet".
+   - Exiba EXCLUSIVAMENTE opções de moradia residencial para alugar. É PROIBIDO oferecer sala comercial, loja, cômodo ou galpão.
+2. ALUGUEL COMERCIAL (para empresas/negócios):
+   - Termos: "sala", "cômodo", "galpão", "loja", "prédio comercial".
+   - Exiba EXCLUSIVAMENTE opções comerciais. É PROIBIDO oferecer casas ou apartamentos residenciais.
+
+ESTRATÉGIA COMERCIAL DE VENDAS E PRIORIDADES:
 1. PRIORIDADE TOTAL NA VENDA DE LOTES:
    - Sempre que o cliente demonstrar interesse em COMPRAR LOTE ou TERRENO (especialmente em Arcos), dê preferência ABSOLUTA para oferecer os lotes nos loteamentos: Serra Verde, São Geraldo, Novo Retiro e Mirante da Serra.
 2. ESTRATÉGIA DE LOTE + CONSTRUÇÃO:
-   - Se procurar casa pronta e não achar no valor/bairro, ofereça comprar o lote nesses bairros + financiamento de construção pelo Banco do Brasil!
+   - Se procurar casa pronta para comprar e não achar no valor/bairro, ofereça comprar o lote nesses bairros + financiamento de construção pelo Banco do Brasil!
 
 PEDIDO DIRETO DE AVALIAÇÃO DE ATENDIMENTO:
 - Sempre que concluir uma ajuda, indicar opções ou enviar o botão de contato do WhatsApp, adicione uma frase curta convidando o cliente a avaliar a resposta:
