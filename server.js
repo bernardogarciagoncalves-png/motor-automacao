@@ -35,27 +35,27 @@ app.post('/api/executar-tarefa', async (req, res) => {
     const imovelAtual = req.body.imovelAtual || null;
 
     // =========================================================================
-    // FILTRAGEM INTELIGENTE DE CATEGORIAS EM CÓDIGO (RESIDENCIAL VS COMERCIAL)
+    // FILTRAGEM INTELIGENTE E AMPLA DE CATEGORIAS (SEM IGNORAR 'CONSULTE A CONDIÇÃO')
     // =========================================================================
     const textoMsg = String(promptDoUsuario).toLowerCase();
 
     if (Array.isArray(contextoImoveis) && contextoImoveis.length > 0) {
-      const palResidenciais = ['casa', 'apartamento', 'sobrado', 'kitnet', 'mansao', 'mansão', 'morar', 'residencial'];
+      const palResidenciais = ['casa', 'apartamento', 'sobrado', 'kitnet', 'mansao', 'mansão', 'morar', 'residencial', 'cobertura', 'residencia'];
       const palComerciais = ['sala', 'comodo', 'cômodo', 'galpao', 'galpão', 'loja', 'comercial', 'predio comercial', 'prédio comercial'];
 
       const pedeResidencial = palResidenciais.some(p => textoMsg.includes(p));
       const pedeComercial = palComerciais.some(p => textoMsg.includes(p));
 
-      // Se o cliente pediu moradia (casa, apto, sobrado, kitnet, mansão), REMOVE comerciais
+      // Se o cliente pediu moradia (casa, apto, mansão, residencial), REMOVE APENAS COMERCIAIS
       if (pedeResidencial && !pedeComercial) {
         contextoImoveis = contextoImoveis.filter(imovel => {
           const dadosStr = JSON.stringify(imovel).toLowerCase();
           const eComercial = palComerciais.some(c => dadosStr.includes(c));
-          return !eComercial;
+          return !eComercial; // Mantém tudo que NÃO é comercial (incluindo Mansão e Consulte a Condição)
         });
       }
 
-      // Se o cliente pediu comercial (sala, cômodo, galpão, loja), REMOVE residenciais
+      // Se o cliente pediu comercial (sala, galpão, loja), REMOVE RESIDENCIAIS
       if (pedeComercial && !pedeResidencial) {
         contextoImoveis = contextoImoveis.filter(imovel => {
           const dadosStr = JSON.stringify(imovel).toLowerCase();
@@ -99,12 +99,12 @@ INFORMAÇÕES DA EMPRESA:
 
 CLASSIFICAÇÃO RÍGIDA DE IMÓVEIS (EXTREMAMENTE IMPORTANTE):
 1. ALUGUEL RESIDENCIAL (para morar):
-   - Termos: "casa", "apartamento", "sobrado", "kitnet", "mansão".
-   - Exiba EXCLUSIVAMENTE opções de moradia residencial para alugar. É PROIBIDO oferecer sala comercial, loja, cômodo ou galpão.
-   - EXIBIÇÃO COMPLETA: Quando o cliente solicitar aluguel residencial em uma cidade (ex: Arcos), APRESENTE TODOS os imóveis residenciais disponíveis para aluguel no banco de dados que atendem ao critério dele, sem omitir opções válidas.
+   - Inclui: "casa", "apartamento", "sobrado", "kitnet", "mansão", "cobertura residencial".
+   - AVISO DE PREÇO: Se o imóvel tiver o preço como "Consulte a Condição", exiba normalmente o card e informe o preço como "Consulte a Condição".
+   - EXIBIÇÃO OBRIGATÓRIA: Quando o cliente pedir moradia/casa para alugar em uma cidade (ex: Arcos), VOCÊ DEVE EXIBIR TODOS os imóveis residenciais de aluguel dessa cidade no banco de dados, INCLUINDO MANSÕES!
 2. ALUGUEL COMERCIAL (para empresas/negócios):
-   - Termos: "sala", "cômodo", "galpão", "loja", "prédio comercial".
-   - Exiba EXCLUSIVAMENTE opções comerciais. É PROIBIDO oferecer casas, apartamentos, sobrados, kitnets ou mansões residenciais.
+   - Inclui: "sala", "cômodo", "galpão", "loja", "prédio comercial".
+   - JAMAIS ofereça salas/galpões para quem pede casa ou moradia.
 
 ESTRATÉGIA COMERCIAL DE VENDAS E PRIORIDADES:
 1. PRIORIDADE TOTAL NA VENDA DE LOTES:
