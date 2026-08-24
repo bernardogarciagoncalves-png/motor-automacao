@@ -35,7 +35,7 @@ app.post('/api/executar-tarefa', async (req, res) => {
     const imovelAtual = req.body.imovelAtual || null;
 
     // =========================================================================
-    // FILTRAGEM INTELIGENTE E AMPLA DE CATEGORIAS (SEM IGNORAR 'CONSULTE A CONDIÇÃO')
+    // FILTRAGEM DE CATEGORIAS (PRESERVA MANSÃO E CONSULTE A CONDIÇÃO)
     // =========================================================================
     const textoMsg = String(promptDoUsuario).toLowerCase();
 
@@ -46,16 +46,16 @@ app.post('/api/executar-tarefa', async (req, res) => {
       const pedeResidencial = palResidenciais.some(p => textoMsg.includes(p));
       const pedeComercial = palComerciais.some(p => textoMsg.includes(p));
 
-      // Se o cliente pediu moradia (casa, apto, mansão, residencial), REMOVE APENAS COMERCIAIS
+      // Se pediu residencial, FILTRA fora os comerciais
       if (pedeResidencial && !pedeComercial) {
         contextoImoveis = contextoImoveis.filter(imovel => {
           const dadosStr = JSON.stringify(imovel).toLowerCase();
           const eComercial = palComerciais.some(c => dadosStr.includes(c));
-          return !eComercial; // Mantém tudo que NÃO é comercial (incluindo Mansão e Consulte a Condição)
+          return !eComercial;
         });
       }
 
-      // Se o cliente pediu comercial (sala, galpão, loja), REMOVE RESIDENCIAIS
+      // Se pediu comercial, FILTRA fora os residenciais
       if (pedeComercial && !pedeResidencial) {
         contextoImoveis = contextoImoveis.filter(imovel => {
           const dadosStr = JSON.stringify(imovel).toLowerCase();
@@ -65,7 +65,7 @@ app.post('/api/executar-tarefa', async (req, res) => {
       }
     }
 
-    // 1. Consulta aprendizados de forma segura no Supabase
+    // Consulta histórico de aprendizado no Supabase
     let exemplosAprendizado = "";
     if (supabase) {
       try {
@@ -97,20 +97,22 @@ INFORMAÇÕES DA EMPRESA:
 1. Correspondente Bancário do Banco do Brasil (financiamentos imobiliários, crédito consignado, empréstimos com garantia de imóvel).
 2. Venda e aluguel de imóveis e loteamentos em Arcos, Bom Despacho, Lagoa da Prata e região.
 
-CLASSIFICAÇÃO RÍGIDA DE IMÓVEIS (EXTREMAMENTE IMPORTANTE):
+REGRA RIGOROSA DE CARDS DE IMÓVEIS (EXTREMAMENTE IMPORTANTE):
+1. NUNCA CRIE LINKS MARKDOWN COMERCIAIS OU FORMATOS COMO "[aqui](...)" OU "Ver Detalhes do Imóvel".
+2. PARA EXIBIR UM IMÓVEL DO BANCO DE DADOS, VOCÊ É OBRIGADO A USAR EXCLUSIVAMENTE A SINTAXE DE TAG ISOLADA:
+   ||| [VER_IMOVEL:{"titulo":"NOME_EXATO_DO_IMOVEL","imagem":"URL_DA_IMAGEM","link":"URL_DO_IMOVEL","preco":"VALOR_OU_CONSULTE_A_CONDICAO"}] |||
+3. IMPORTANTE: Copie EXATAMENTE o titulo, link e imagem do objeto JSON do imóvel correspondente no catálogo. NUNCA misture o link de um imóvel (ex: terreno) com o título de outro (ex: casa/mansão).
+
+CLASSIFICAÇÃO DE IMÓVEIS:
 1. ALUGUEL RESIDENCIAL (para morar):
    - Inclui: "casa", "apartamento", "sobrado", "kitnet", "mansão", "cobertura residencial".
-   - AVISO DE PREÇO: Se o imóvel tiver o preço como "Consulte a Condição", exiba normalmente o card e informe o preço como "Consulte a Condição".
-   - EXIBIÇÃO OBRIGATÓRIA: Quando o cliente pedir moradia/casa para alugar em uma cidade (ex: Arcos), VOCÊ DEVE EXIBIR TODOS os imóveis residenciais de aluguel dessa cidade no banco de dados, INCLUINDO MANSÕES!
-2. ALUGUEL COMERCIAL (para empresas/negócios):
-   - Inclui: "sala", "cômodo", "galpão", "loja", "prédio comercial".
-   - JAMAIS ofereça salas/galpões para quem pede casa ou moradia.
+   - Se o preço for "Consulte a Condição", exiba o card normalmente com a string "Consulte a Condição".
+   - Se o cliente solicitar moradia/casa em Arcos, APRESENTE A MANSÃO RESIDENCIAL e todas as opções residenciais disponíveis do catálogo.
+2. ALUGUEL COMERCIAL:
+   - Jamais ofereça galpão, loja ou sala para quem pede casa ou moradia.
 
 ESTRATÉGIA COMERCIAL DE VENDAS E PRIORIDADES:
-1. PRIORIDADE TOTAL NA VENDA DE LOTES:
-   - Sempre que o cliente demonstrar interesse em COMPRAR LOTE ou TERRENO (especialmente em Arcos), dê preferência ABSOLUTA para oferecer os lotes nos loteamentos: Serra Verde, São Geraldo, Novo Retiro e Mirante da Serra.
-2. ESTRATÉGIA DE LOTE + CONSTRUÇÃO:
-   - Se procurar casa pronta para comprar e não achar no valor/bairro, ofereça comprar o lote nesses bairros + financiamento de construção pelo Banco do Brasil!
+- Em compras de lotes em Arcos, dê prioridade aos loteamentos: Serra Verde, São Geraldo, Novo Retiro e Mirante da Serra.
 
 PEDIDO DIRETO DE AVALIAÇÃO DE ATENDIMENTO:
 - Sempre que concluir uma ajuda, indicar opções ou enviar o botão de contato do WhatsApp, adicione uma frase curta convidando o cliente a avaliar a resposta:
@@ -119,9 +121,8 @@ PEDIDO DIRETO DE AVALIAÇÃO DE ATENDIMENTO:
 REGRA ANTI-ALUCINAÇÃO E VERACIDADE:
 - NUNCA invente dados de escritura, habite-se ou taxas. Se não souber, encaminhe para o WhatsApp.
 
-REGRAS DE CARDS E WHATSAPP:
-- Mande cards APENAS na tag isolada: ||| [VER_IMOVEL:{"titulo":"...","imagem":"...","link":"...","preco":"..."}] |||
-- Botão WhatsApp: 📲 [Clique aqui para falar com nosso corretor no WhatsApp](https://wa.me/5537991146240?text=Olá!%20Tenho%20interesse%20em:%20NOME_DO_PRODUTO)
+BOTÃO DO WHATSAPP:
+📲 [Clique aqui para falar com nosso corretor no WhatsApp](https://wa.me/5537991146240?text=Olá!%20Tenho%20interesse%20em:%20NOME_DO_PRODUTO)
 ${exemplosAprendizado}
 
 IMÓVEL DA PÁGINA ATUAL:
